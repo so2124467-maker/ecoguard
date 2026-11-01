@@ -42,5 +42,5 @@
 ---
 
 ## 5. APK 파일 위치
-* **저장소 내 경로:** `apk/[팀명]_EcoGuard_release.apk`
+* **저장소 내 경로:** `apk/ecoGuard_release.apk`
 * **바로가기:** [APK 폴더로 이동](./apk/)

@@ -1,1128 +1,329 @@
 <!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EcoGuard - 현대차 Pleos Connect 배터리 수명 솔루션</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-    
-    body {
-      background-color: #05070a;
-      color: #ffffff;
-      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, sans-serif;
-      padding: 16px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    #car-display {
-      width: 100%;
-      max-width: 1180px;
-      background: #0f141f;
-      border: 2px solid #283548;
-      border-radius: 20px;
-      overflow: hidden;
-      box-shadow: 0 25px 60px rgba(0,0,0,0.9);
-      position: relative;
-    }
-
-    /* 테마 */
-    #car-display.theme-morning { background: #142234; border-color: #00e599; }
-    #car-display.theme-morning .top-bar { background: #0c1622; }
-    #car-display.theme-morning .card { background: #1b2c40; }
-    #car-display.theme-morning .navi-header-bar { background: #132233; }
-    #car-display.theme-morning .driving-box { background: #1b2c40; }
-
-    #car-display.theme-day { background: #111a26; border-color: #38bdf8; }
-    #car-display.theme-day .top-bar { background: #0b121b; }
-    #car-display.theme-day .card { background: #172435; }
-
-    #car-display.theme-night { background: #090c12; border-color: #1e293b; }
-    #car-display.theme-night .top-bar { background: #05070a; }
-    #car-display.theme-night .card { background: #0f1520; }
-    #car-display.theme-night .navi-header-bar { background: #0c1017; }
-    #car-display.theme-night .driving-box { background: #0f1520; }
-
-    /* 상단 상태바 */
-    .top-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 14px 28px;
-      background: #090c12;
-      border-bottom: 1px solid #1c2635;
-      font-size: 13px;
-      color: #94a3b8;
-    }
-    .top-left { display: flex; align-items: center; gap: 12px; }
-    .time-selector {
-      background: #1e2738;
-      color: #38bdf8;
-      border: 1px solid #3b82f6;
-      padding: 5px 10px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    .top-right { display: flex; align-items: center; gap: 12px; }
-    .voice-toggle {
-      background: #1a2230;
-      color: #38bdf8;
-      border: 1px solid #2d3c52;
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 12px;
-      cursor: pointer;
-      font-weight: 600;
-    }
-    .point-badge {
-      background: #1e3a8a;
-      color: #60a5fa;
-      padding: 6px 14px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: bold;
-      border: 1px solid #2563eb;
-      transition: transform 0.2s, background-color 0.2s;
-    }
-    .point-badge.highlight {
-      transform: scale(1.1);
-      background-color: #2563eb;
-      color: #ffffff;
-    }
-
-    /* 시나리오 탭 네비게이션 */
-    .tabs {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 28px;
-      background: #141b27;
-      border-bottom: 1px solid #202c3d;
-    }
-    .tab-group { display: flex; gap: 10px; }
-    .tab-btn {
-      background: #1e2738;
-      color: #94a3b8;
-      border: 1px solid #2d3c52;
-      padding: 10px 18px;
-      border-radius: 10px;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 13px;
-    }
-    .tab-btn.active {
-      background: #00e599;
-      color: #07090e;
-      border-color: #00e599;
-      font-weight: bold;
-    }
-    .safety-tag {
-      font-size: 12px;
-      font-weight: 600;
-      color: #94a3b8;
-      background: #0b0f17;
-      padding: 6px 14px;
-      border-radius: 6px;
-      border: 1px solid #202c3d;
-    }
-
-    /* 화면 컨테이너 */
-    .screen { display: none; padding: 24px 28px; min-height: 440px; }
-    .screen.active { display: block; }
-
-    /* 🚀 시스템 가동 중 오버레이 */
-    #drive-start-overlay {
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: radial-gradient(circle at center, rgba(0, 229, 153, 0.35) 0%, rgba(5, 7, 10, 0.98) 80%);
-      display: none;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 500;
-    }
-    .speed-lines {
-      width: 170px; height: 170px;
-      border: 3px dashed #00e599;
-      border-radius: 50%;
-      display: flex; justify-content: center; align-items: center;
-      animation: rotateRadar 1.5s linear infinite;
-    }
-    @keyframes rotateRadar { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    .hud-title {
-      font-size: 24px; font-weight: 800; color: #00e599; margin-top: 20px; letter-spacing: 1px;
-    }
-
-    /* 그리드 및 카드 */
-    .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
-    .card {
-      background: #161e2c;
-      border: 1px solid #263347;
-      border-radius: 16px;
-      padding: 22px;
-      display: flex;
-      flex-direction: column;
-    }
-    .val-huge {
-      font-size: 46px; font-weight: 800; color: #00e599; margin: 12px 0 4px; letter-spacing: -1px;
-    }
-    .btn-main {
-      width: 100%; margin-top: auto; padding: 16px;
-      background: #00e599; color: #07090e; border: none;
-      border-radius: 12px; font-weight: 800; font-size: 15px; cursor: pointer;
-      display: flex; justify-content: center; align-items: center; gap: 8px;
-    }
-    .btn-secondary {
-      width: 100%; margin-top: auto; padding: 16px;
-      background: #1e2738; color: #e2e8f0; border: 1px solid #33445c;
-      border-radius: 12px; font-weight: bold; cursor: pointer;
-    }
-
-    /* 내비 TBT 헤더 바 */
-    .navi-header-bar {
-      max-width: 760px;
-      margin: 0 auto 12px;
-      background: #101622;
-      border: 1px solid #2a374c;
-      border-radius: 12px;
-      padding: 10px 18px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .navi-tbt-info { display: flex; align-items: center; gap: 12px; }
-    .navi-arrow-icon {
-      font-size: 22px;
-      background: #1e293b;
-      padding: 6px 12px;
-      border-radius: 8px;
-      color: #38bdf8;
-      font-weight: bold;
-      border: 1px solid #38bdf8;
-    }
-
-    .driving-box {
-      text-align: center;
-      padding: 24px 20px;
-      background: #161e2c;
-      border: 2px solid #00e599;
-      border-radius: 16px;
-      max-width: 760px;
-      margin: 0 auto;
-      box-shadow: 0 0 35px rgba(0, 229, 153, 0.12);
-    }
-
-    /* 계기판형 파워/회생 미터기 */
-    .meter-container {
-      max-width: 760px;
-      margin: 14px auto 0;
-      background: #161e2c;
-      padding: 16px 22px;
-      border-radius: 16px;
-      border: 1px solid #263347;
-    }
-    .meter-track {
-      height: 16px;
-      background: #0a0e14;
-      border-radius: 8px;
-      display: flex;
-      position: relative;
-      overflow: hidden;
-      margin: 8px 0;
-      border: 1px solid #202c3d;
-    }
-    .meter-center-line {
-      position: absolute;
-      left: 50%; top: 0; bottom: 0; width: 2px;
-      background: #ffffff; z-index: 10;
-    }
-    .meter-fill {
-      height: 100%;
-      transition: width 0.3s ease, left 0.3s ease, background-color 0.3s;
-    }
-
-    /* CAN 신호 테스트 */
-    .test-pedal-panel {
-      max-width: 760px;
-      margin: 14px auto 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #0f1622;
-      border: 1px dashed #33445c;
-      padding: 10px 18px;
-      border-radius: 12px;
-    }
-    .btn-pedal {
-      padding: 8px 18px;
-      background: #ef4444;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-weight: bold;
-      font-size: 13px;
-      cursor: pointer;
-    }
-
-    /* 🛡️ 브라우저 네이티브 최상위 DIALOG 모달 */
-    dialog#comfort-modal {
-      margin: auto;
-      border: 2px solid #3b82f6;
-      border-radius: 24px;
-      background: #111722;
-      color: #ffffff;
-      padding: 34px 40px;
-      max-width: 600px;
-      width: 92%;
-      text-align: center;
-      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.95), 0 0 40px rgba(59, 130, 246, 0.45);
-      position: relative;
-    }
-    dialog#comfort-modal::backdrop {
-      background: rgba(5, 7, 10, 0.94);
-      backdrop-filter: blur(12px);
-    }
-
-    .benefit-highlight-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin: 18px 0;
-    }
-    .benefit-item {
-      background: #090e17;
-      border: 1px solid #1e2c3f;
-      border-radius: 14px;
-      padding: 16px;
-      text-align: center;
-    }
-    .benefit-val {
-      font-size: 24px;
-      font-weight: 800;
-      margin-top: 4px;
-    }
-    .btn-claim-huge {
-      background: linear-gradient(135deg, #2563eb, #1d4ed8);
-      color: #ffffff;
-      border: none;
-      padding: 18px 28px;
-      border-radius: 14px;
-      font-size: 17px;
-      font-weight: 800;
-      cursor: pointer;
-      width: 100%;
-      box-shadow: 0 10px 25px rgba(37, 99, 235, 0.45);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 10px;
-      transition: transform 0.15s, box-shadow 0.15s;
-    }
-    .btn-claim-huge:active {
-      transform: scale(0.98);
-    }
-
-    .inline-comfort-banner {
-      background: #111722;
-      border: 2px solid #3b82f6;
-      border-radius: 20px;
-      padding: 24px;
-      margin-bottom: 20px;
-      text-align: center;
-      box-shadow: 0 10px 30px rgba(59, 130, 246, 0.2);
-    }
-
-    /* 💥 현대카드 [ M ] 로고 크레딧 폭죽 연출 레이어 */
-    #fx-credit-overlay {
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      pointer-events: none;
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-      border-radius: 24px;
-      background: radial-gradient(circle, rgba(37, 99, 235, 0.25) 0%, rgba(17, 23, 34, 0) 70%);
-    }
-    .m-burst-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      animation: popOut 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    .m-badge-logo {
-      width: 90px;
-      height: 90px;
-      background: linear-gradient(135deg, #2563eb, #60a5fa);
-      border-radius: 24px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-size: 52px;
-      font-weight: 900;
-      color: #ffffff;
-      font-family: -apple-system, sans-serif;
-      box-shadow: 0 0 50px rgba(59, 130, 246, 0.9), 0 0 100px rgba(0, 229, 153, 0.6);
-      border: 3px solid rgba(255, 255, 255, 0.8);
-    }
-    .m-burst-text {
-      font-size: 26px;
-      font-weight: 900;
-      color: #00e599;
-      text-shadow: 0 0 20px rgba(0, 229, 153, 0.8);
-      margin-top: 14px;
-      letter-spacing: -0.5px;
-    }
-    @keyframes popOut {
-      0% { transform: scale(0.2); opacity: 0; }
-      40% { transform: scale(1.15); opacity: 1; }
-      70% { transform: scale(1.0); opacity: 1; }
-      100% { transform: scale(1.05); opacity: 0; }
-    }
-    #confetti-canvas {
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      pointer-events: none;
-    }
-  </style>
-</head>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>EcoGuard - 현대차 Pleos Connect 배터리 수명 솔루션</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;user-select:none}
+body{background:#05070a;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Segoe UI",Roboto,sans-serif;padding:16px;display:flex;justify-content:center;align-items:center;min-height:100vh}
+#car-display{--bg:#090c12;--card:#0f1520;--bar:#05070a;--bd:#1e293b;width:100%;max-width:1180px;background:var(--bg);border:2px solid var(--bd);border-radius:20px;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,.9);position:relative}
+.theme-morning{--bg:#142234;--card:#1b2c40;--bar:#0c1622;--bd:#00e599}
+.theme-day{--bg:#111a26;--card:#172435;--bar:#0b121b;--bd:#38bdf8}
+.muted{color:#94a3b8}.sm{font-size:12px}.note{font-size:11px;color:#8392a8;margin-top:6px}
+.top-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:14px 28px;background:var(--bar);border-bottom:1px solid #1c2635;font-size:13px;color:#94a3b8}
+.top-left,.top-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.time-selector{background:#1e2738;color:#38bdf8;border:1px solid #3b82f6;padding:5px 10px;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer}
+.voice-toggle{background:#1a2230;color:#38bdf8;border:1px solid #2d3c52;padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600}
+.point-badge{background:#1e3a8a;color:#93c5fd;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:bold;border:1px solid #2563eb;transition:transform .2s,background-color .2s}
+.point-badge.highlight{transform:scale(1.1);background:#2563eb;color:#fff}
+.tabs{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:12px 28px;background:#141b27;border-bottom:1px solid #202c3d}
+.tab-group{display:flex;gap:10px;flex-wrap:wrap}
+.tab-btn{background:#1e2738;color:#94a3b8;border:1px solid #2d3c52;padding:10px 18px;border-radius:10px;cursor:pointer;font-weight:600;font-size:13px}
+.tab-btn.active{background:#00e599;color:#07090e;border-color:#00e599;font-weight:bold}
+.tab-btn:focus-visible,button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.safety-tag{font-size:12px;font-weight:600;color:#94a3b8;background:#0b0f17;padding:6px 14px;border-radius:6px;border:1px solid #202c3d}
+.screen{display:none;padding:24px 28px;min-height:440px}.screen.active{display:block}
+#drive-start-overlay{position:absolute;inset:0;background:radial-gradient(circle,rgba(0,229,153,.35) 0%,rgba(5,7,10,.98) 80%);display:none;flex-direction:column;justify-content:center;align-items:center;z-index:500}
+.speed-lines{width:170px;height:170px;border:3px dashed #00e599;border-radius:50%;display:flex;justify-content:center;align-items:center;animation:rot 1.5s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.hud-title{font-size:24px;font-weight:800;color:#00e599;margin-top:20px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.card{background:var(--card);border:1px solid #263347;border-radius:16px;padding:22px;display:flex;flex-direction:column}
+.card h4{font-size:14px;color:#e2e8f0;margin-bottom:8px}
+.card p,.card li{font-size:13px;color:#b6c2d4;line-height:1.7}.card ul{padding-left:16px}
+.val-huge{font-size:42px;font-weight:800;color:#00e599;margin:10px 0 4px;letter-spacing:-1px}
+.btn-main,.btn-secondary{width:100%;margin-top:auto;padding:16px;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;display:flex;justify-content:center;align-items:center;gap:8px}
+.btn-main{background:#00e599;color:#07090e;border:none}
+.btn-secondary{background:#1e2738;color:#e2e8f0;border:1px solid #33445c;font-weight:bold}
+.navi-header-bar{max-width:760px;margin:0 auto 12px;background:#101622;border:1px solid #2a374c;border-radius:12px;padding:10px 18px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.navi-tbt-info{display:flex;align-items:center;gap:12px}
+.navi-arrow-icon{font-size:22px;background:#1e293b;padding:6px 12px;border-radius:8px;color:#38bdf8;font-weight:bold;border:1px solid #38bdf8}
+.driving-box{text-align:center;padding:24px 20px;background:var(--card);border:2px solid #00e599;border-radius:16px;max-width:760px;margin:0 auto;box-shadow:0 0 35px rgba(0,229,153,.12)}
+.meter-container{max-width:760px;margin:14px auto 0;background:var(--card);padding:16px 22px;border-radius:16px;border:1px solid #263347}
+.meter-track{height:16px;background:#0a0e14;border-radius:8px;position:relative;overflow:hidden;margin:8px 0;border:1px solid #202c3d}
+.meter-center-line{position:absolute;left:50%;top:0;bottom:0;width:2px;background:#fff;z-index:10}
+#meter-bar{position:absolute;height:100%;left:50%;width:0;background:#00e599;transition:width .3s,left .3s,background-color .3s}
+.test-pedal-panel{max-width:760px;margin:14px auto 0;display:flex;justify-content:space-between;align-items:center;gap:10px;background:#0f1622;border:1px dashed #33445c;padding:10px 18px;border-radius:12px}
+.btn-pedal{padding:8px 18px;background:#ef4444;color:#fff;border:none;border-radius:8px;font-weight:bold;font-size:13px;cursor:pointer}
+.chip{display:inline-block;font-size:11px;font-weight:bold;padding:2px 8px;border-radius:4px;background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.4)}
+dialog#comfort-modal{margin:auto;border:2px solid #3b82f6;border-radius:24px;background:#111722;color:#fff;padding:34px 40px;max-width:600px;width:92%;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.95),0 0 40px rgba(59,130,246,.45);position:relative}
+dialog#comfort-modal::backdrop{background:rgba(5,7,10,.94);backdrop-filter:blur(12px)}
+.benefit-highlight-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0}
+.benefit-item{background:#090e17;border:1px solid #1e2c3f;border-radius:14px;padding:16px;text-align:center}
+.benefit-val{font-size:24px;font-weight:800;margin-top:4px}
+.btn-claim-huge{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:18px 28px;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;width:100%;box-shadow:0 10px 25px rgba(37,99,235,.45);transition:transform .15s}
+.btn-claim-huge:active{transform:scale(.98)}.btn-claim-huge.done{background:#10b981;box-shadow:none}
+#fx-credit-overlay{position:absolute;inset:0;pointer-events:none;display:none;justify-content:center;align-items:center;z-index:1000;border-radius:24px;background:radial-gradient(circle,rgba(37,99,235,.25) 0%,rgba(17,23,34,0) 70%)}
+.m-burst-container{display:flex;flex-direction:column;align-items:center;animation:pop 1.5s cubic-bezier(.16,1,.3,1) forwards}
+.m-badge-logo{width:90px;height:90px;background:linear-gradient(135deg,#2563eb,#60a5fa);border-radius:24px;display:flex;justify-content:center;align-items:center;font-size:52px;font-weight:900;box-shadow:0 0 50px rgba(59,130,246,.9);border:3px solid rgba(255,255,255,.8)}
+.m-burst-text{font-size:24px;font-weight:900;color:#00e599;margin-top:14px}
+@keyframes pop{0%{transform:scale(.2);opacity:0}40%{transform:scale(1.15);opacity:1}70%{transform:scale(1);opacity:1}100%{transform:scale(1.05);opacity:0}}
+#confetti-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.flow{display:flex;align-items:stretch;gap:10px;margin-bottom:18px}
+.flow div{flex:1;background:var(--card);border:1px solid #2d3c52;border-radius:12px;padding:14px;font-size:13px;color:#e2e8f0;line-height:1.6;text-align:center}
+.flow span{align-self:center;color:#38bdf8;font-weight:bold}
+.row{display:flex;justify-content:space-between;font-size:13px;color:#cbd5e1;padding:5px 0;border-bottom:1px solid #1e2c3f}
+#toast{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);background:#1e293b;border:1px solid #38bdf8;color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;display:none;z-index:900}
+@media(max-width:860px){.grid{grid-template-columns:1fr}.flow{flex-direction:column}.flow span{transform:rotate(90deg)}.screen,.top-bar,.tabs{padding-left:16px;padding-right:16px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head>
 <body>
+<dialog id="comfort-modal">
+  <div id="fx-credit-overlay"><canvas id="confetti-canvas"></canvas>
+    <div class="m-burst-container"><div class="m-badge-logo">M</div><div class="m-burst-text" id="burst-text"></div></div></div>
+  <div style="font-size:46px;margin-bottom:8px" id="modal-icon"></div>
+  <div style="font-size:24px;font-weight:800;line-height:1.4;margin-bottom:10px" id="modal-header"></div>
+  <div style="font-size:14px;color:#94a3b8;line-height:1.6;margin-bottom:8px" id="modal-desc"></div>
+  <div class="benefit-highlight-grid">
+    <div class="benefit-item"><div class="sm muted">이번 주행 수명 방어</div><div class="benefit-val" style="color:#00e599" id="m-life"></div><div class="note">C-rate 스트레스 방어 기준</div></div>
+    <div class="benefit-item"><div class="sm muted">감가 방어액 (추정)</div><div class="benefit-val" style="color:#38bdf8" id="m-won"></div><div class="note">이번 주행 기준</div></div>
+  </div>
+  <button class="btn-claim-huge claim-btn" onclick="claim()"></button>
+  <div class="note">예시 데이터 · 가정 산식 기준 (서비스 구조 탭 참고)</div>
+</dialog>
 
-  <!-- 🎁 브라우저 네이티브 최상위 DIALOG 모달 -->
-  <dialog id="comfort-modal">
-    <div id="fx-credit-overlay">
-      <canvas id="confetti-canvas"></canvas>
-      <div class="m-burst-container">
-        <div class="m-badge-logo">M</div>
-        <div class="m-burst-text">+420 M·POINT EARNED!</div>
-      </div>
+<div id="car-display" class="theme-night">
+  <div id="drive-start-overlay"><div class="speed-lines"><span style="font-size:46px">⚡</span></div>
+    <div class="hud-title">EcoGuard 가동 중</div>
+    <div class="sm muted" style="margin-top:8px">지형 고저차 맵 로딩 · 배터리 실시간 케어 시작</div></div>
+  <div id="toast"></div>
+
+  <div class="top-bar">
+    <div class="top-left">
+      <span id="current-clock-display"></span>
+      <select class="time-selector" id="time-mode-select" onchange="changeTimeMode()" aria-label="시연용 시간대 선택">
+        <option value="morning">🌅 아침 출근길 (08:30)</option>
+        <option value="day">🌤️ 낮 일상주행 (14:15)</option>
+        <option value="night" selected>🌙 저녁 퇴근길 (21:30)</option>
+      </select><span class="chip">시연용</span>
+      <span id="gear-indicator" style="color:#00e599;font-weight:bold">[P] PARK</span>
     </div>
-
-    <div style="font-size: 46px; margin-bottom: 8px;" id="modal-icon">🌙 🚗</div>
-    <div style="font-size: 24px; font-weight: 800; line-height: 1.4; margin-bottom: 10px;" id="modal-header">
-      오늘 하루도 정말 고생 많으셨습니다!<br>
-      <span style="color:#60a5fa;">안전하게 귀가하신 것을 축하드려요.</span>
-    </div>
-    <div style="font-size: 14px; color: #94a3b8; line-height: 1.6; margin-bottom: 20px;" id="modal-desc">
-      지친 퇴근길에도 배터리를 배려해 주신 덕분에 오늘 하루 놀라운 가치를 지켜냈습니다.
-    </div>
-
-    <!-- 💡 배터리 수명 연장 실질적 베네핏 -->
-    <div class="benefit-highlight-grid">
-      <div class="benefit-item">
-        <div style="font-size: 12px; color: #94a3b8;">배터리 수명 연장 효과</div>
-        <div class="benefit-val" style="color: #00e599;">+2.4일 연장</div>
-        <div style="font-size: 11px; color: #64748b; margin-top: 2px;">C-rate 스트레스 방어</div>
-      </div>
-      <div class="benefit-item">
-        <div style="font-size: 12px; color: #94a3b8;">차량 잔존 가치 보존</div>
-        <div class="benefit-val" style="color: #38bdf8;">+4,200원 상당</div>
-        <div style="font-size: 11px; color: #64748b; margin-top: 2px;">중고차 감가 방어액</div>
-      </div>
-    </div>
-
-    <button class="btn-claim-huge" id="modal-claim-btn" onclick="claimFromModal()">
-      <span>🎁 현대카드 <b>+420 M포인트</b> 바로 적립받기</span>
-    </button>
-  </dialog>
-
-  <div id="car-display" class="theme-night">
-    <!-- 가동 오버레이 -->
-    <div id="drive-start-overlay">
-      <div class="speed-lines"><span style="font-size: 46px;">⚡</span></div>
-      <div class="hud-title">EcoGuard 시스템 가동 중...</div>
-      <div style="font-size: 14px; color: #94a3b8; margin-top: 8px;">지형 고저차 맵 로딩 및 배터리 실시간 케어 시작</div>
-    </div>
-
-    <!-- 상단 상태바 -->
-    <div class="top-bar">
-      <div class="top-left">
-        <span id="current-clock-display">21:30 | LTE | 15℃</span>
-        <select class="time-selector" id="time-mode-select" onchange="changeTimeMode(this.value)">
-          <option value="morning">🌅 아침 출근길 모드 (08:30)</option>
-          <option value="day">🌤️ 낮 일상주행 모드 (14:15)</option>
-          <option value="night" selected>🌙 저녁·심야 퇴근길 (21:30)</option>
-        </select>
-        <span id="gear-indicator" style="color:#00e599; font-weight:bold;">[P] PARK</span>
-      </div>
-      <div class="top-right">
-        <button class="voice-toggle" id="voice-btn" onclick="toggleVoice()">🔊 음성 안내 ON</button>
-        <div class="point-badge" id="m-point">현대카드 M포인트: 42,500 P</div>
-      </div>
-    </div>
-
-    <!-- 탭 네비게이션 -->
-    <div class="tabs">
-      <div class="tab-group">
-        <button class="tab-btn active" id="btn-tab1" onclick="showTab('tab1', this)">1. 탑승 전</button>
-        <button class="tab-btn" id="btn-tab2" onclick="showTab('tab2', this)">2. 주행 중</button>
-        <button class="tab-btn" id="btn-tab3" onclick="showTab('tab3', this)">3. 주행 종료</button>
-      </div>
-      <div class="safety-tag" id="safety-tag">🛡️ Pleos Connect 안전 규격 준수 (터치 활성화)</div>
-    </div>
-
-    <!-- 1. 탑승 전 -->
-    <div id="tab1" class="screen active">
-      <div class="grid">
-        <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="color:#94a3b8; font-size:13px;">배터리 SOH 종합 진단</span>
-            <span style="background:rgba(0,229,153,0.15); color:#00e599; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:bold;">A+ 최상 등급</span>
-          </div>
-          <div class="val-huge">98.4%</div>
-          <div style="color:#00e599; font-size:13px; font-weight:bold; margin-bottom:12px;">SoC 잔량 78% (342 km)</div>
-          <hr style="border:0; border-top:1px solid #263347; margin:6px 0 12px;">
-          <div style="font-size:13px; color:#cbd5e1; line-height:1.75;">
-            • 셀 간 전압 편차: <b>0.008V (최적 밸런싱)</b><br>
-            • 열화 스트레스 누적률: <b>0.12% (동급 상위 1%)</b><br>
-            • 잔존 가치 방어율: <b>신차 대비 99.1% 유지</b>
-          </div>
-        </div>
-
-        <div class="card">
-          <div style="color:#94a3b8; font-size:13px;">지형 기반 에코 내비게이션</div>
-          <div style="margin-top:14px; padding:12px; background:#0c1118; border:1px solid #00e599; border-radius:10px;">
-            <div style="font-size:14px; font-weight:bold; color:#00e599;" id="nav-path-title">안심 퇴근 에코 경로 (28 km)</div>
-            <div style="font-size:12px; color:#94a3b8; margin-top:4px;">급경사 우회 · 회생제동 최적 충전 구간 3개 포함</div>
-          </div>
-          <svg width="100%" height="45" style="margin-top:10px;">
-            <path d="M 0 35 Q 70 10 150 25 T 300 15 L 300 45 L 0 45 Z" fill="rgba(0,229,153,0.12)" stroke="#00e599" stroke-width="2"/>
-          </svg>
-          <button class="btn-main" id="start-drive-btn" onclick="startEcoDrive()">
-            <span id="start-btn-text">에코 경로로 주행 시작</span> ➔
-          </button>
-        </div>
-
-        <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="color:#94a3b8; font-size:13px;">리튬 플레이팅 방지 프리히팅</span>
-            <span style="color:#38bdf8; font-size:11px; font-weight:bold;">BMS 감지 중</span>
-          </div>
-          <p style="font-size:13px; color:#94a3b8; margin-top:12px; line-height:1.65;">
-            현재 팩 온도에서 급속 회생제동 시 발생할 수 있는 <b>음극 표면 리튬 석출(Plating)</b>을 방지하기 위해 셀 최적 승온 및 사전 밸런싱을 수행합니다.
-          </p>
-          <button class="btn-secondary" onclick="alert('배터리 셀 밸런싱 및 승온 최적화 완료!')">
-            BMS 프리히팅 가동
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2. 주행 중 -->
-    <div id="tab2" class="screen">
-      <div class="navi-header-bar">
-        <div class="navi-tbt-info">
-          <div class="navi-arrow-icon" id="navi-arrow">⤓</div>
-          <div>
-            <div style="font-size:14px; font-weight:bold; color:#fff;" id="navi-tbt-text">300m 앞 상동호수공원 방면</div>
-            <div style="font-size:11px; color:#94a3b8;" id="navi-sub-text">현대 내비 에코 추천 경로 안내 중</div>
-          </div>
-        </div>
-        <div style="font-size:12px; color:#38bdf8; font-weight:bold; background:#0b111a; padding:5px 12px; border-radius:6px; border:1px solid #1e2d42;">
-          GPS 순항 중 · 8.2 km 남음
-        </div>
-      </div>
-
-      <div class="driving-box" id="guide-box">
-        <div style="font-size:38px; margin-bottom:6px;" id="guide-icon">🦶 ➔ 🚫</div>
-        <div style="font-size:21px; font-weight:bold; color:#fff;" id="guide-title">완만한 내리막 지형 감지</div>
-        <div style="color:#00e599; font-size:15px; font-weight:bold; margin:6px 0 10px;" id="guide-action">가속 페달에서 발을 떼고 탄력 주행(Coasting)하세요</div>
-        <div style="font-size:13px; color:#94a3b8;" id="guide-desc">예상 에너지 회생: +0.4 kWh · 배터리 수명 방어: +5분</div>
-      </div>
-
-      <!-- 계기판형 파워/회생 미터기 + BSI 지수 -->
-      <div class="meter-container">
-        <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px; font-weight:bold;">
-          <span style="color:#38bdf8;">◀ CHARGE (에너지 회생 중)</span>
-          <span style="color:#94a3b8;">중립 (0kW)</span>
-          <span style="color:#f59e0b;">POWER (방전 스트레스) ▶</span>
-        </div>
-        <div class="meter-track">
-          <div class="meter-center-line"></div>
-          <div class="meter-fill" id="meter-bar" style="position:absolute; left:50%; width:0%; background:#00e599;"></div>
-        </div>
-        <div style="display:flex; justify-content:space-between; font-size:12px; color:#94a3b8; margin-top:8px;">
-          <span>현재 속도: <b style="color:#fff;" id="current-speed">78 km/h</b></span>
-          <span>동적 방전율: <b style="color:#00e599;" id="current-crate">+0.6 C (안정)</b></span>
-          <span>열화 스트레스(BSI): <b style="color:#00e599;" id="bsi-value">14 (Safe)</b></span>
-          <span>셀 온도: <b style="color:#fff;">24.8 ℃</b></span>
-        </div>
-      </div>
-
-      <!-- CAN 신호 시뮬레이터 -->
-      <div class="test-pedal-panel">
-        <div style="font-size:12px; color:#cbd5e1;">
-          🛠️ <b>차량 CAN 신호 반응 테스트</b>: 가속 페달을 깊게 밟을 때의 배터리 충격 제어를 확인해 보세요.
-        </div>
-        <button class="btn-pedal" onmousedown="pressPedal()" onmouseup="releasePedal()" ontouchstart="pressPedal()" ontouchend="releasePedal()">
-          ⚠️ 가속 페달 깊게 밟기 (급가속)
-        </button>
-      </div>
-
-      <div style="text-align:center; margin-top:18px;">
-        <button id="finish-btn" style="padding:14px 34px; background:#1b2434; color:#38bdf8; border:2px solid #38bdf8; border-radius:12px; font-size:15px; font-weight:800; cursor:pointer;" onclick="finishDrive()">
-          도착 및 주차 [P단 체결] 시뮬레이션
-        </button>
-      </div>
-    </div>
-
-    <!-- 3. 주행 종료 -->
-    <div id="tab3" class="screen">
-      <div class="inline-comfort-banner">
-        <div style="font-size: 38px; margin-bottom: 6px;" id="inline-modal-icon">🌙 🚗</div>
-        <div style="font-size: 21px; font-weight: 800; margin-bottom: 6px;" id="inline-modal-header">
-          오늘 하루도 정말 고생 많으셨습니다!
-        </div>
-        <div style="font-size: 13px; color: #94a3b8; margin-bottom: 16px;" id="inline-modal-desc">
-          지친 퇴근길에도 배터리를 배려해 주신 덕분에 오늘 하루 놀라운 가치를 지켜냈습니다.
-        </div>
-
-        <div class="benefit-highlight-grid" style="max-width: 500px; margin: 0 auto 16px;">
-          <div class="benefit-item">
-            <div style="font-size: 11px; color: #94a3b8;">배터리 수명 연장 효과</div>
-            <div class="benefit-val" style="color: #00e599; font-size: 20px;">+2.4일 연장</div>
-          </div>
-          <div class="benefit-item">
-            <div style="font-size: 11px; color: #94a3b8;">차량 잔존 가치 보존</div>
-            <div class="benefit-val" style="color: #38bdf8; font-size: 20px;">+4,200원 상당</div>
-          </div>
-        </div>
-
-        <button class="btn-claim-huge" style="max-width: 500px; margin: 0 auto;" id="inline-claim-btn" onclick="claimFromModal()">
-          🎁 현대카드 +420 M포인트 바로 적립받기
-        </button>
-      </div>
-
-      <div class="grid">
-        <div class="card" style="text-align:center;">
-          <div style="color:#94a3b8; font-size:13px;">배터리 수명 방어 시간</div>
-          <div class="val-huge">+3.2 시간</div>
-          <div style="font-size:12px; color:#64748b;">기준 주행 모델 대비</div>
-        </div>
-        <div class="card" style="text-align:center;">
-          <div style="color:#94a3b8; font-size:13px;">잔존 가치 보존 환산</div>
-          <div class="val-huge" style="color:#38bdf8;">+1,850 원</div>
-          <div style="font-size:12px; color:#64748b;">중고차 감가 방어액</div>
-        </div>
-        <div class="card" style="text-align:center;">
-          <div style="color:#94a3b8; font-size:13px;">탄소 배출 절감량</div>
-          <div class="val-huge" style="color:#f59e0b;">420 g</div>
-          <div style="font-size:12px; color:#64748b;">소나무 1.2그루 효과</div>
-        </div>
-      </div>
-
-      <!-- 캘린더 열화 방어 -->
-      <div style="margin-top:16px; padding:16px 22px; background:#121a28; border:1px solid #22c55e; border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
-        <div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="background:#22c55e; color:#07090e; font-size:11px; font-weight:bold; padding:2px 8px; border-radius:4px;">캘린더 열화 방어</span>
-            <b style="font-size:14px; color:#fff;">야간 슬립 충전 상한선 80% 스마트 리밋 제안</b>
-          </div>
-          <div style="font-size:12px; color:#94a3b8; margin-top:4px;">
-            내일 주행거리를 고려할 때, 100% 만충 상태 방치 시 전해액 산화 열화가 촉진됩니다. 80% 상한 충전을 권장합니다.
-          </div>
-        </div>
-        <button id="charge-limit-btn" style="padding:10px 18px; background:#1e293b; color:#22c55e; border:1px solid #22c55e; border-radius:8px; font-weight:bold; font-size:12px; cursor:pointer;" onclick="toggleChargeLimit(this)">
-          80% 충전 상한 적용 ON
-        </button>
-      </div>
-
-      <!-- 현대카페이 배너 -->
-      <div id="carpay-banner" style="margin-top:12px; padding:14px 22px; background:#0c1118; border:1px dashed #38bdf8; border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
-        <div style="font-size:12px; color:#cbd5e1;">
-          ⚡ <b>현대 차내 간편결제(CarPay) 연동</b>: 적립된 M포인트를 다음 <b>E-pit 초고속 충전 요금</b> 결제 시 즉시 사용할 수 있습니다.
-        </div>
-        <button style="padding:8px 16px; background:#1b2434; color:#38bdf8; border:1px solid #38bdf8; border-radius:8px; font-size:12px; cursor:pointer;" onclick="alert('차량 현대카페이에 사용 결제 등록 완료!')">
-          충전 결제 시 사용 설정
-        </button>
-      </div>
+    <div class="top-right">
+      <button class="voice-toggle" id="voice-btn" onclick="toggleVoice()">🔊 음성 안내 ON</button>
+      <div class="point-badge" id="m-point">현대카드 M포인트: 42,500 P</div>
     </div>
   </div>
 
-  <script>
-    var driveInterval = null;
-    var scenarioInterval = null;
-    var voiceEnabled = true;
-    var isPedalPressed = false;
-    var selectedNaturalVoice = null;
+  <div class="tabs">
+    <div class="tab-group">
+      <button class="tab-btn active" id="btn-tab1" onclick="showTab('tab1',this)">1. 탑승 전</button>
+      <button class="tab-btn" id="btn-tab2" onclick="showTab('tab2',this)">2. 주행 중</button>
+      <button class="tab-btn" id="btn-tab3" onclick="showTab('tab3',this)">3. 주행 종료</button>
+      <button class="tab-btn" id="btn-tab4" onclick="showTab('tab4',this)">4. 서비스 구조</button>
+    </div>
+    <div class="safety-tag" id="safety-tag"></div>
+  </div>
 
-    var timeBasedContent = {
-      morning: {
-        clock: "08:30 | LTE | 14℃",
-        themeClass: "theme-morning",
-        icon: "☀️ 🚗",
-        header: "오늘 하루도 힘차게 파이팅하세요!<br><span style='color:#00e599;'>활기찬 아침, 에코가드가 응원합니다.</span>",
-        desc: "상쾌한 출근길에도 배터리를 아껴주신 덕분에 오늘 하루 놀라운 가치를 지켜냈습니다.",
-        voice: "상쾌한 아침이네요, 오늘도 안전 운전하시고, 힘찬 하루 보내세요. 파이팅!",
-        navTitle: "출근길 안심 에코 경로",
-        startBtn: "에코 경로로 출근 주행 시작"
-      },
-      day: {
-        clock: "14:15 | LTE | 21℃",
-        themeClass: "theme-day",
-        icon: "🌤️ 🚗",
-        header: "기분 좋은 오후, 안전하게 도착하셨습니다!",
-        desc: "여유로운 주행으로 배터리 잔존 가치를 든든히 지켜주셨습니다. 남은 하루도 편안하세요.",
-        voice: "목적지에 편안하게 도착하셨어요. 남은 하루도 안전 운전하세요.",
-        navTitle: "일상 안심 에코 경로",
-        startBtn: "에코 경로로 주행 시작"
-      },
-      night: {
-        clock: "21:30 | LTE | 15℃",
-        themeClass: "theme-night",
-        icon: "🌙 🚗",
-        header: "오늘 하루도 정말 고생 많으셨습니다!<br><span style='color:#60a5fa;'>안전하게 귀가하신 것을 축하드려요.</span>",
-        desc: "지친 퇴근길에도 배터리를 배려해 주신 덕분에 오늘 하루 놀라운 가치를 지켜냈습니다.",
-        voice: "오늘 하루도, 정말 고생 많으셨어요. 푹 쉬시고, 편안한 저녁 보내세요.",
-        navTitle: "퇴근길 안심 에코 경로",
-        startBtn: "에코 경로로 퇴근 주행 시작"
-      }
-    };
+  <!-- 1. 탑승 전 -->
+  <div id="tab1" class="screen active"><div class="grid">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="muted sm">배터리 SOH 종합 진단</span><span class="chip" style="background:rgba(0,229,153,.15);color:#00e599;border-color:rgba(0,229,153,.4)">예시 · A+</span></div>
+      <div class="val-huge">98.4%</div>
+      <div style="color:#00e599;font-size:13px;font-weight:bold;margin-bottom:12px">SoC 78% · 주행 가능 342 km</div>
+      <hr style="border:0;border-top:1px solid #263347;margin:6px 0 12px">
+      <div style="font-size:13px;color:#cbd5e1;line-height:1.75">
+        • 셀 간 전압 편차: <b>0.008 V</b> (양호)<br>• 누적 열화 스트레스: <b>0.12%</b><br>• 신차 대비 용량 유지: <b>99.1%</b> (추정)</div>
+      <div class="note">SOH는 실차에서 BMS 신호로 산출합니다. 현재 화면 값은 시연용 예시예요.</div>
+    </div>
+    <div class="card">
+      <div class="muted sm">지형 기반 에코 내비게이션</div>
+      <div style="margin-top:14px;padding:12px;background:#0c1118;border:1px solid #00e599;border-radius:10px">
+        <div style="font-size:14px;font-weight:bold;color:#00e599" id="nav-path-title"></div>
+        <div class="sm muted" style="margin-top:4px">급경사 우회 · 회생 구간 3곳</div></div>
+      <svg width="100%" height="45" style="margin:10px 0" aria-hidden="true"><path d="M0 35Q70 10 150 25T300 15L300 45L0 45Z" fill="rgba(0,229,153,.12)" stroke="#00e599" stroke-width="2"/></svg>
+      <button class="btn-main" id="start-drive-btn" onclick="startEcoDrive()"><span id="start-btn-text"></span> ➔</button>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span class="muted sm">저온 충전 보호 (프리히팅)</span><span style="color:#38bdf8;font-size:11px;font-weight:bold">BMS 감지 중</span></div>
+      <p style="margin:12px 0">팩 온도가 낮을 때 급속 회생제동을 하면 음극에 리튬이 쌓일 수 있어요(리튬 플레이팅). 주행 전에 셀 온도를 미리 높여 이를 줄입니다.</p>
+      <button class="btn-secondary" onclick="toast('셀 승온 최적화를 시작했어요 (시연)')">프리히팅 시작</button>
+    </div>
+  </div></div>
 
-    function loadBestVoice() {
-      if (!('speechSynthesis' in window)) return;
-      var voices = window.speechSynthesis.getVoices();
-      if (!voices || voices.length === 0) return;
+  <!-- 2. 주행 중 -->
+  <div id="tab2" class="screen">
+    <div class="navi-header-bar">
+      <div class="navi-tbt-info"><div class="navi-arrow-icon" id="navi-arrow">⤓</div>
+        <div><div style="font-size:14px;font-weight:bold" id="navi-tbt-text"></div><div class="sm muted" id="navi-sub-text"></div></div></div>
+      <div class="sm" style="color:#38bdf8;font-weight:bold">8.2 km 남음</div>
+    </div>
+    <div class="driving-box" id="guide-box">
+      <div style="font-size:38px;margin-bottom:6px" id="guide-icon"></div>
+      <div style="font-size:22px;font-weight:bold" id="guide-title"></div>
+      <div style="font-size:16px;font-weight:bold;margin:6px 0 8px" id="guide-action"></div>
+      <div class="sm muted" id="guide-desc"></div>
+    </div>
+    <div class="meter-container">
+      <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:bold">
+        <span style="color:#38bdf8">◀ 회생 충전</span><span class="muted">0 kW</span><span style="color:#f59e0b">방전 ▶</span></div>
+      <div class="meter-track"><div class="meter-center-line"></div><div id="meter-bar"></div></div>
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:12px;color:#94a3b8;margin-top:8px">
+        <span>속도 <b style="color:#fff" id="current-speed"></b></span>
+        <span>방전율 <b id="current-crate"></b></span>
+        <span>열화 스트레스(BSI) <b id="bsi-value"></b></span>
+        <span>셀 온도 <b style="color:#fff">24.8 ℃</b></span></div>
+    </div>
+    <div class="test-pedal-panel">
+      <div class="sm" style="color:#cbd5e1"><span class="chip">시연 패널</span> 급가속 때 배터리 부담과 포인트가 어떻게 달라지는지 확인해 보세요. 실차에서는 표시되지 않아요.</div>
+      <button class="btn-pedal" onmousedown="pressPedal()" onmouseup="releasePedal()" onmouseleave="releasePedal()" ontouchstart="pressPedal()" ontouchend="releasePedal()">⚠️ 급가속 (누르고 있기)</button>
+    </div>
+    <div style="text-align:center;margin-top:18px">
+      <button style="padding:14px 34px;background:#1b2434;color:#38bdf8;border:2px solid #38bdf8;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer" onclick="finishDrive()">도착 · P단 체결 (시연)</button></div>
+  </div>
 
-      var koreanVoices = voices.filter(function(v) {
-        return v.lang.includes('ko') || v.lang.includes('KO');
-      });
+  <!-- 3. 주행 종료 -->
+  <div id="tab3" class="screen">
+    <div class="grid">
+      <div class="card" style="text-align:center"><div class="muted sm">이번 주행 수명 방어</div><div class="val-huge" id="r-life"></div><div class="note">기준 주행 대비 (가정 산식)</div></div>
+      <div class="card" style="text-align:center"><div class="muted sm">감가 방어액 (추정)</div><div class="val-huge" style="color:#38bdf8" id="r-won"></div><div class="note">이번 주행 기준 · 수명 1시간당 약 580원 가정</div></div>
+      <div class="card" style="text-align:center"><div class="muted sm">회생 에너지 회수</div><div class="val-huge" style="color:#f59e0b">0.4 kWh</div><div class="note">탄소 약 180 g 절감 (배출계수 0.45 kg/kWh 가정)</div></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><h4>에코 포인트 산정 <span class="chip">가정 산식</span></h4><span class="sm muted">이달 18회 주행 누적: 수명 +2.4일 (예시)</span></div>
+      <div class="row"><span id="b1-l"></span><b id="b1-v"></b></div>
+      <div class="row"><span>회생제동 활용</span><b>+120</b></div>
+      <div class="row"><span>정속 순항 구간</span><b>+100</b></div>
+      <div class="row" style="border:0"><span><b>합계 (1 에코 포인트 = 1 M포인트 전환)</b></span><b style="color:#00e599" id="b-total"></b></div>
+      <button class="btn-claim-huge claim-btn" style="margin-top:12px" onclick="claim()"></button>
+    </div>
+    <div style="margin-top:16px;padding:16px 22px;background:#121a28;border:1px solid #22c55e;border-radius:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div><span class="chip" style="color:#22c55e;border-color:#22c55e;background:rgba(34,197,94,.12)">보관 중 열화 방지</span>
+        <b style="font-size:14px;margin-left:6px">야간 충전 상한 80% 제안</b>
+        <div class="sm muted" style="margin-top:4px">100% 상태로 오래 두면 셀 열화가 빨라져요. 내일 주행거리에 맞춰 80%까지만 충전해요.</div></div>
+      <button id="charge-limit-btn" style="padding:10px 18px;background:#1e293b;color:#22c55e;border:1px solid #22c55e;border-radius:8px;font-weight:bold;font-size:12px;cursor:pointer" onclick="toggleChargeLimit(this)">충전 상한 80% 적용 중</button>
+    </div>
+    <div style="margin-top:12px;padding:14px 22px;background:#0c1118;border:1px dashed #38bdf8;border-radius:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div class="sm" style="color:#cbd5e1">⚡ <b>CarPay 연동</b>: 적립한 M포인트를 E-pit 초고속 충전 요금 결제에 사용할 수 있어요.</div>
+      <button style="padding:8px 16px;background:#1b2434;color:#38bdf8;border:1px solid #38bdf8;border-radius:8px;font-size:12px;cursor:pointer" onclick="toast('충전 결제에 M포인트 사용을 설정했어요 (시연)')">충전 결제에 사용</button>
+    </div>
+  </div>
 
-      selectedNaturalVoice = koreanVoices.find(function(v) {
-        return v.name.includes('Natural') || v.name.includes('SunHi') || v.name.includes('InJoon') || v.name.includes('Online');
-      }) || koreanVoices.find(function(v) {
-        return v.name.includes('Google') || v.name.includes('Yuna');
-      }) || koreanVoices[0] || null;
-    }
+  <!-- 4. 서비스 구조 -->
+  <div id="tab4" class="screen">
+    <div class="flow">
+      <div><b>차량 CAN · BMS</b><br>속도, 전류, 셀 온도, SoC</div><span>➔</span>
+      <div><b>EcoGuard 점수 엔진</b><br>방전율·BSI 산출</div><span>➔</span>
+      <div><b>에코 포인트 산정</b><br>급가속·회생·정속</div><span>➔</span>
+      <div><b>현대카드 M포인트</b><br>전환 · CarPay 결제</div>
+    </div>
+    <div class="grid">
+      <div class="card"><h4>포인트 구조 (가정)</h4><ul><li>급가속 억제 최대 200 · 회생 활용 120 · 정속 순항 100</li><li>1 에코 포인트 = 1 M포인트, 일일 적립 상한 적용</li></ul></div>
+      <div class="card"><h4>재원과 이해관계 (가정)</h4><ul><li>현대카드: 제휴 마케팅 예산으로 고객 접점 확대</li><li>현대차: 배터리 보증 비용 절감, 잔존가치 개선</li><li>고객: 포인트 + 배터리 수명</li></ul></div>
+      <div class="card"><h4>어뷰징 방지</h4><ul><li>서버에서 차량 신호 서명 검증</li><li>정차·공회전 시간은 산정 제외</li><li>이상 패턴 탐지와 일일 상한</li></ul></div>
+      <div class="card"><h4>데이터와 동의</h4><ul><li>주행 데이터 수집과 카드 연동에 각각 동의</li><li>위치정보는 경로 계산에만 쓰고 최소 수집</li></ul></div>
+      <div class="card"><h4>효과 검증 계획</h4><ul><li>서비스 사용·미사용 차량의 열화율 비교</li><li>수명 방어 산식은 제조사 열화 데이터로 보정</li></ul></div>
+      <div class="card"><h4>현재 범위와 로드맵</h4><ul><li>현재: 웹 기반 시뮬레이션 (화면의 수치는 예시)</li><li>다음: 실차 CAN·BMS 연동 → SOH 산출 검증 → 카드 API 연동</li></ul></div>
+    </div>
+  </div>
+</div>
 
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.onvoiceschanged = loadBestVoice;
-      loadBestVoice();
-    }
+<script>
+var driveInterval=null,scenarioInterval=null,voiceEnabled=true,isPedalPressed=false,voiceSel=null,gear='P';
+var trip={hard:0,claimed:false},currentPoints=42500;
+var T={
+ morning:{clock:"08:30 | LTE | 14℃",cls:"theme-morning",icon:"☀️ 🚗",header:"오늘도 힘차게 시작해요!<br><span style='color:#00e599'>안전하게 도착하셨어요.</span>",desc:"출근길에도 배터리를 아껴 주셨어요.",voice:"안전하게 도착하셨어요. 오늘도 힘찬 하루 보내세요.",nav:"출근길 에코 경로",btn:"출근 주행 시작"},
+ day:{clock:"14:15 | LTE | 21℃",cls:"theme-day",icon:"🌤️ 🚗",header:"안전하게 도착하셨어요!",desc:"여유로운 주행으로 배터리를 잘 지켜 주셨어요.",voice:"편안하게 도착하셨어요. 남은 하루도 안전하게 보내세요.",nav:"일상 에코 경로",btn:"주행 시작"},
+ night:{clock:"21:30 | LTE | 15℃",cls:"theme-night",icon:"🌙 🚗",header:"오늘 하루도 수고 많으셨어요!<br><span style='color:#60a5fa'>안전하게 도착하셨어요.</span>",desc:"퇴근길에도 배터리를 배려해 주셨어요.",voice:"오늘 하루도 수고 많으셨어요. 푹 쉬세요.",nav:"퇴근길 에코 경로",btn:"퇴근 주행 시작"}};
+var scenarios=[
+ {arrow:"⤓",tbt:"300m 앞 상동호수공원 방면",sub:"완만한 내리막 · 회생 구간",icon:"🦶 ➔ 🚫",title:"완만한 내리막",action:"가속 페달에서 발을 떼세요",desc:"예상 회생 +0.4 kWh",color:"#00e599",type:"charge",bsi:"8 (안전)"},
+ {arrow:"↶",tbt:"250m 앞 연속 급커브",sub:"곡률 반경 80m 이하",icon:"🔄 ➔ ⚠️",title:"연속 급커브 구간",action:"미리 천천히 감속하세요",desc:"급가감속을 줄이면 배터리 부담이 줄어요",color:"#f59e0b",type:"power",bsi:"28 (주의)"},
+ {arrow:"🛡️",tbt:"50m 앞 어린이 보호구역",sub:"제한속도 30km/h",icon:"🛡️ ➔ ✨",title:"어린이 보호구역",action:"30km/h 정속을 유지하세요",desc:"배터리 부담이 가장 낮은 구간이에요",color:"#38bdf8",type:"eco",bsi:"11 (안전)"}];
+var sIdx=0;
+function $(i){return document.getElementById(i)}
+function mode(){return $('time-mode-select').value}
+function toast(m){var t=$('toast');t.innerText=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(function(){t.style.display='none'},2200)}
 
-    function getCurrentTimeMode() {
-      return document.getElementById('time-mode-select').value;
-    }
+function loadVoice(){if(!('speechSynthesis' in window))return;var v=speechSynthesis.getVoices().filter(function(x){return /ko/i.test(x.lang)});
+ voiceSel=v.find(function(x){return /Natural|SunHi|InJoon|Online/.test(x.name)})||v.find(function(x){return /Google|Yuna/.test(x.name)})||v[0]||null}
+if('speechSynthesis' in window){speechSynthesis.onvoiceschanged=loadVoice;loadVoice()}
+function safeTTS(text,cb){
+ if(!voiceEnabled||!('speechSynthesis' in window)){if(cb)cb();return}
+ try{speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(text);u.lang='ko-KR';if(!voiceSel)loadVoice();if(voiceSel)u.voice=voiceSel;u.rate=.88;
+  var done=false,f=function(){if(!done){done=true;if(cb)cb()}};u.onend=f;u.onerror=f;setTimeout(f,Math.max(2800,text.length*240));speechSynthesis.speak(u)}catch(e){if(cb)cb()}}
+function toggleVoice(){voiceEnabled=!voiceEnabled;var b=$('voice-btn');
+ if(voiceEnabled){b.innerText='🔊 음성 안내 ON';b.style.color='#38bdf8';safeTTS("음성 안내가 켜졌어요.")}else{b.innerText='🔇 음성 안내 OFF';b.style.color='#94a3b8';if('speechSynthesis' in window)speechSynthesis.cancel()}}
 
-    function updateTimeUI() {
-      var mode = getCurrentTimeMode();
-      var data = timeBasedContent[mode];
-      var display = document.getElementById('car-display');
+/* 단일 산식: 포인트·수명·감가를 한 곳에서 계산 */
+function calc(){var life=Math.max(.4,3.2-.8*trip.hard);
+ return{pts:Math.max(0,200-100*trip.hard)+220,life:life,won:Math.round(life*578),brake:Math.max(0,200-100*trip.hard)}}
+function claimLabel(){return trip.claimed?'✅ M포인트 '+calc().pts+'P 전환 완료':'🎁 에코 포인트 '+calc().pts+'P를 M포인트로 전환'}
+function renderResult(){var c=calc(),fixed=c.life.toFixed(1);
+ $('r-life').innerText='+'+fixed+' 시간';$('r-won').innerText='+'+c.won.toLocaleString()+' 원';
+ $('m-life').innerText='+'+fixed+' 시간';$('m-won').innerText='약 '+c.won.toLocaleString()+'원';
+ $('b1-l').innerText='급가속 억제 (이번 주행 급가속 '+trip.hard+'회)';$('b1-v').innerText='+'+c.brake;$('b-total').innerText=c.pts+' P';
+ $('burst-text').innerText='+'+c.pts+' M포인트 전환 완료';
+ document.querySelectorAll('.claim-btn').forEach(function(b){b.innerText=claimLabel();b.classList.toggle('done',trip.claimed)})}
 
-      display.classList.remove('theme-morning', 'theme-day', 'theme-night');
-      display.classList.add(data.themeClass);
+function updateTimeUI(){var d=T[mode()],el=$('car-display');
+ el.classList.remove('theme-morning','theme-day','theme-night');el.classList.add(d.cls);
+ $('current-clock-display').innerText=d.clock;$('modal-icon').innerText=d.icon;$('modal-header').innerHTML=d.header;$('modal-desc').innerText=d.desc;
+ $('nav-path-title').innerText=d.nav+" (28 km)";$('start-btn-text').innerText=d.btn;renderResult()}
+function changeTimeMode(){updateTimeUI();safeTTS({morning:"아침 출근길 모드예요.",day:"낮 일상주행 모드예요.",night:"퇴근길 모드예요."}[mode()])}
 
-      document.getElementById('current-clock-display').innerText = data.clock;
-      
-      document.getElementById('modal-icon').innerText = data.icon;
-      document.getElementById('modal-header').innerHTML = data.header;
-      document.getElementById('modal-desc').innerHTML = data.desc;
+function showTab(id,btn){
+ document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});
+ document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});
+ $(id).classList.add('active');if(btn)btn.classList.add('active');
+ var g=$('gear-indicator'),s=$('safety-tag');
+ if(id==='tab2'){gear='D';g.innerText='[D] DRIVE';g.style.color='#38bdf8';s.innerText='🚫 주행 중에는 터치가 잠기고 음성으로 안내해요';s.style.color='#f59e0b';startTelemetry()}
+ else{gear='P';g.innerText='[P] PARK';g.style.color='#00e599';s.innerText='🛡️ 주차 상태: 설정·포인트 전환 가능';s.style.color='#94a3b8';stopTelemetry()}}
 
-      document.getElementById('inline-modal-icon').innerText = data.icon;
-      document.getElementById('inline-modal-header').innerHTML = data.header;
-      document.getElementById('inline-modal-desc').innerHTML = data.desc;
+function startEcoDrive(){
+ var b=$('start-drive-btn');trip.hard=0;trip.claimed=false;renderResult();b.style.background='#059669';$('start-btn-text').innerText='경로 설정 중...';
+ safeTTS("배터리 케어 에코 경로로 안내를 시작해요.",function(){
+  var o=$('drive-start-overlay');o.style.display='flex';
+  setTimeout(function(){o.style.display='none';b.style.background='#00e599';updateTimeUI();showTab('tab2',$('btn-tab2'));
+   setTimeout(function(){safeTTS("300미터 앞 내리막이에요. 가속 페달에서 발을 떼 주세요.")},350)},1200)})}
 
-      document.getElementById('nav-path-title').innerText = data.navTitle + " (28 km)";
-      document.getElementById('start-btn-text').innerText = data.startBtn;
-    }
+function finishDrive(){stopTelemetry();showTab('tab3',$('btn-tab3'));updateTimeUI();
+ var m=$('comfort-modal');try{m.showModal()}catch(e){m.style.display='flex'}safeTTS(T[mode()].voice)}
 
-    function changeTimeMode(val) {
-      updateTimeUI();
-      var mode = getCurrentTimeMode();
-      if (mode === 'morning') safeTTS("아침 출근길 모드로 전환되었습니다, 활기찬 하루 되세요.");
-      else if (mode === 'night') safeTTS("야간 퇴근길 모드로 전환되었습니다, 안전 운전하세요.");
-    }
+function fireConfetti(){var cv=$('confetti-canvas');if(!cv)return;var x=cv.getContext('2d');cv.width=cv.parentElement.clientWidth;cv.height=cv.parentElement.clientHeight;
+ var cols=['#2563eb','#60a5fa','#00e599','#f59e0b','#fff'],p=[];
+ for(var i=0;i<45;i++)p.push({x:cv.width/2,y:cv.height/2,vx:(Math.random()-.5)*14,vy:(Math.random()-.7)*16,s:Math.random()*8+4,c:cols[i%5],r:Math.random()*360,rs:(Math.random()-.5)*10,o:1});
+ (function draw(){x.clearRect(0,0,cv.width,cv.height);var alive=false;
+  p.forEach(function(q){q.x+=q.vx;q.y+=q.vy;q.vy+=.35;q.r+=q.rs;q.o-=.015;if(q.o>0){alive=true;x.save();x.translate(q.x,q.y);x.rotate(q.r*Math.PI/180);x.fillStyle=q.c;x.globalAlpha=q.o;x.fillRect(-q.s/2,-q.s/2,q.s,q.s);x.restore()}});
+  if(alive)requestAnimationFrame(draw)})()}
 
-    function toggleVoice() {
-      voiceEnabled = !voiceEnabled;
-      var btn = document.getElementById('voice-btn');
-      if (voiceEnabled) {
-        btn.innerText = '🔊 음성 안내 ON';
-        btn.style.color = '#38bdf8';
-        safeTTS("음성 안내가 켜졌습니다.");
-      } else {
-        btn.innerText = '🔇 음성 안내 OFF';
-        btn.style.color = '#94a3b8';
-        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-      }
-    }
+function claim(){
+ if(gear!=='P'){toast('주차(P단) 상태에서만 전환할 수 있어요');return}
+ if(trip.claimed)return;
+ trip.claimed=true;var pts=calc().pts;renderResult();
+ var fx=$('fx-credit-overlay'),m=$('comfort-modal');
+ if(m.open){fx.style.display='flex';fireConfetti()}
+ safeTTS("에코 포인트 "+pts+"점을 현대카드 엠포인트로 전환했어요.");
+ var badge=$('m-point'),target=currentPoints+pts,step=Math.max(1,Math.ceil(pts/14));badge.classList.add('highlight');
+ var iv=setInterval(function(){currentPoints=Math.min(target,currentPoints+step);badge.innerText="현대카드 M포인트: "+currentPoints.toLocaleString()+" P";
+  if(currentPoints>=target){clearInterval(iv);badge.classList.remove('highlight')}},30);
+ setTimeout(function(){fx.style.display='none';try{m.close()}catch(e){m.style.display='none'}},1400)}
 
-    // 🎙️ 음성이 완전히 끝난 후 콜백을 실행하도록 고도화
-    function safeTTS(text, onEndCallback) {
-      if (!voiceEnabled || !('speechSynthesis' in window)) {
-        if (onEndCallback) onEndCallback();
-        return;
-      }
+function setGuide(s){$('guide-box').style.borderColor=s.color;$('guide-icon').innerText=s.icon;$('guide-title').innerText=s.title;
+ $('guide-action').innerText=s.action;$('guide-action').style.color=s.color;$('guide-desc').innerText=s.desc}
+function setMeter(color,left,width,crate,crateColor,speed,bsi,bsiColor){var b=$('meter-bar');b.style.background=color;b.style.left=left+'%';b.style.width=width+'%';
+ $('current-crate').innerText=crate;$('current-crate').style.color=crateColor;$('current-speed').innerText=speed;$('bsi-value').innerText=bsi;$('bsi-value').style.color=bsiColor}
 
-      try {
-        window.speechSynthesis.cancel();
-        var utter = new SpeechSynthesisUtterance(text);
-        utter.lang = 'ko-KR';
-        
-        if (!selectedNaturalVoice) loadBestVoice();
-        if (selectedNaturalVoice) utter.voice = selectedNaturalVoice;
+function pressPedal(){
+ if(isPedalPressed)return;isPedalPressed=true;trip.hard++;renderResult();
+ setMeter('#ef4444',50,48,'+1.5 C (고출력)','#ef4444','104 km/h','82 (위험)','#ef4444');
+ setGuide({color:'#ef4444',icon:'⚠️ ➔ ⚡',title:'급가속 감지',action:'서서히 가속하세요',desc:'고출력이 이어지면 배터리 부담이 커지고 포인트가 줄어요'})}
+function releasePedal(){if(!isPedalPressed)return;isPedalPressed=false;setGuide(scenarios[sIdx]);applyMeter()}
 
-        utter.rate = 0.88;
-        utter.pitch = 1.02;
+function applyMeter(){var s=scenarios[sIdx],r=Math.random();
+ if(s.type==='charge')setMeter('#38bdf8',50-Math.floor(20+r*25),Math.floor(20+r*25),'-0.2 C (회생 중)','#38bdf8','74 km/h',s.bsi,'#00e599');
+ else if(s.type==='power')setMeter('#f59e0b',50,Math.floor(22+r*18),'+0.4 C (주의)','#f59e0b','68 km/h',s.bsi,'#f59e0b');
+ else setMeter('#00e599',50,Math.floor(8+r*10),'+0.1 C (최적)','#00e599','30 km/h',s.bsi,'#00e599')}
+function showScenario(){var s=scenarios[sIdx];$('navi-arrow').innerText=s.arrow;$('navi-tbt-text').innerText=s.tbt;$('navi-sub-text').innerText=s.sub;setGuide(s)}
+function startTelemetry(){stopTelemetry();sIdx=0;showScenario();applyMeter();
+ driveInterval=setInterval(function(){if(!isPedalPressed)applyMeter()},1000);
+ scenarioInterval=setInterval(function(){if(isPedalPressed)return;sIdx=(sIdx+1)%scenarios.length;showScenario();applyMeter()},8500)}
+function stopTelemetry(){clearInterval(driveInterval);clearInterval(scenarioInterval);driveInterval=scenarioInterval=null;isPedalPressed=false}
 
-        var hasFinished = false;
-        var finishHandler = function() {
-          if (!hasFinished) {
-            hasFinished = true;
-            if (onEndCallback) onEndCallback();
-          }
-        };
+var isLimitOn=true;
+function toggleChargeLimit(b){
+ if(gear!=='P'){toast('주차(P단) 상태에서만 변경할 수 있어요');return}
+ isLimitOn=!isLimitOn;
+ if(isLimitOn){b.innerText='충전 상한 80% 적용 중';b.style.color='#22c55e';b.style.borderColor='#22c55e';toast('야간 충전 상한을 80%로 설정했어요')}
+ else{b.innerText='100% 완전 충전 모드';b.style.color='#94a3b8';b.style.borderColor='#33445c';toast('장거리 운행을 위해 100%까지 충전해요')}}
 
-        utter.onend = finishHandler;
-        utter.onerror = finishHandler;
-
-        // 브라우저 백업 타이머 (말속도 0.88 감안하여 글자수 * 240ms로 여유 배치)
-        var estimatedMs = Math.max(2800, text.length * 240);
-        setTimeout(finishHandler, estimatedMs);
-
-        window.speechSynthesis.speak(utter);
-      } catch (e) {
-        if (onEndCallback) onEndCallback();
-      }
-    }
-
-    function showTab(tabId, btn) {
-      document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
-      document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
-      
-      var targetScreen = document.getElementById(tabId);
-      if (targetScreen) targetScreen.classList.add('active');
-      if (btn) btn.classList.add('active');
-
-      var gear = document.getElementById('gear-indicator');
-      var safetyTag = document.getElementById('safety-tag');
-
-      if (tabId === 'tab2') {
-        gear.innerText = '[D] DRIVE';
-        gear.style.color = '#38bdf8';
-        safetyTag.innerText = '🚫 주행 중 운전자 시선분산 방지 (화면 터치 잠김)';
-        safetyTag.style.color = '#f59e0b';
-        startTelemetrySimulation();
-      } else {
-        gear.innerText = '[P] PARK';
-        gear.style.color = '#00e599';
-        safetyTag.innerText = '🛡️ Pleos Connect 안전 규격 준수 (터치 활성화)';
-        safetyTag.style.color = '#94a3b8';
-        stopTelemetrySimulation();
-      }
-    }
-
-    // 🚀 1. 주행 시작: 음성이 마침표까지 완전히 끝난 직후 오버레이 및 화면 전환
-    function startEcoDrive() {
-      var btn = document.getElementById('start-drive-btn');
-      btn.style.background = '#059669';
-      btn.innerHTML = '<span>경로 설정 중...</span>';
-
-      // 📢 안내 음성을 먼저 재생하고, 완전히 "끝나면" 콜백으로 화면 전환 시작!
-      safeTTS("배터리 케어 에코 경로로 안내를 시작합니다, 안전 운전하세요.", function() {
-        var overlay = document.getElementById('drive-start-overlay');
-        overlay.style.display = 'flex';
-
-        setTimeout(function() {
-          overlay.style.display = 'none';
-          btn.style.background = '#00e599';
-          btn.innerHTML = '<span>에코 경로로 주행 시작</span> ➔';
-          
-          showTab('tab2', document.getElementById('btn-tab2'));
-
-          setTimeout(function() {
-            safeTTS("300미터 앞, 내리막 구간입니다, 가속 페달에서 발을 떼고 탄력 주행하세요.");
-          }, 350);
-
-        }, 1200);
-      });
-    }
-
-    // 🎁 브라우저 네이티브 최상위 Dialog 오픈
-    function openComfortModal(playVoice) {
-      updateTimeUI();
-      var modal = document.getElementById('comfort-modal');
-      if (modal) {
-        try {
-          modal.showModal();
-        } catch (e) {
-          modal.style.display = 'flex';
-        }
-      }
-      if (playVoice) {
-        var mode = getCurrentTimeMode();
-        safeTTS(timeBasedContent[mode].voice);
-      }
-    }
-
-    // 🌟 2. P단 체결
-    function finishDrive() {
-      stopTelemetrySimulation();
-      showTab('tab3', document.getElementById('btn-tab3'));
-      openComfortModal(true);
-    }
-
-    // 💥 M 로고 크레딧 팡팡 파티클 애니메이션
-    function fireConfetti() {
-      var canvas = document.getElementById('confetti-canvas');
-      if (!canvas) return;
-      var ctx = canvas.getContext('2d');
-      canvas.width = canvas.parentElement.clientWidth;
-      canvas.height = canvas.parentElement.clientHeight;
-
-      var particles = [];
-      var colors = ['#2563eb', '#60a5fa', '#00e599', '#f59e0b', '#ffffff'];
-
-      for (var i = 0; i < 45; i++) {
-        particles.push({
-          x: canvas.width / 2,
-          y: canvas.height / 2,
-          vx: (Math.random() - 0.5) * 14,
-          vy: (Math.random() - 0.7) * 16,
-          size: Math.random() * 8 + 4,
-          color: colors[Math.floor(Math.random() * colors.length)],
-          rotation: Math.random() * 360,
-          rotSpeed: (Math.random() - 0.5) * 10,
-          opacity: 1
-        });
-      }
-
-      function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        var alive = false;
-        particles.forEach(function(p) {
-          p.x += p.vx;
-          p.y += p.vy;
-          p.vy += 0.35;
-          p.rotation += p.rotSpeed;
-          p.opacity -= 0.015;
-
-          if (p.opacity > 0) {
-            alive = true;
-            ctx.save();
-            ctx.translate(p.x, p.y);
-            ctx.rotate((p.rotation * Math.PI) / 180);
-            ctx.fillStyle = p.color;
-            ctx.globalAlpha = p.opacity;
-            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
-            ctx.restore();
-          }
-        });
-
-        if (alive) {
-          requestAnimationFrame(draw);
-        }
-      }
-      requestAnimationFrame(draw);
-    }
-
-    // 💳 3. M포인트 받기
-    var currentPoints = 42500;
-    var targetPoints = 42920;
-
-    function claimFromModal() {
-      var fxOverlay = document.getElementById('fx-credit-overlay');
-      if (fxOverlay) {
-        fxOverlay.style.display = 'flex';
-        fireConfetti();
-      }
-
-      safeTTS("현대카드 420 엠포인트가, 정상 적립되었습니다.");
-
-      var badge = document.getElementById('m-point');
-      badge.classList.add('highlight');
-      var step = 14;
-      var counterInterval = setInterval(function() {
-        currentPoints += step;
-        if (currentPoints >= targetPoints) {
-          currentPoints = targetPoints;
-          clearInterval(counterInterval);
-          badge.classList.remove('highlight');
-        }
-        badge.innerText = "현대카드 M포인트: " + currentPoints.toLocaleString() + " P";
-      }, 30);
-
-      setTimeout(function() {
-        if (fxOverlay) fxOverlay.style.display = 'none';
-        var modal = document.getElementById('comfort-modal');
-        if (modal) {
-          try { modal.close(); } catch (e) { modal.style.display = 'none'; }
-        }
-
-        var inlineBtn = document.getElementById('inline-claim-btn');
-        if (inlineBtn) {
-          inlineBtn.innerText = '✅ 420 M포인트 적립 완료';
-          inlineBtn.style.background = '#10b981';
-        }
-      }, 1400);
-    }
-
-    function pressPedal() {
-      isPedalPressed = true;
-      var bar = document.getElementById('meter-bar');
-      bar.style.background = '#ef4444';
-      bar.style.left = '50%';
-      bar.style.width = '48%';
-      document.getElementById('current-crate').innerText = '+1.9 C (CRITICAL 방전)';
-      document.getElementById('current-crate').style.color = '#ef4444';
-      document.getElementById('current-speed').innerText = '104 km/h';
-
-      document.getElementById('bsi-value').innerText = '82 (위험)';
-      document.getElementById('bsi-value').style.color = '#ef4444';
-
-      var box = document.getElementById('guide-box');
-      box.style.borderColor = '#ef4444';
-      document.getElementById('guide-icon').innerText = '⚠️ ➔ ⚡';
-      document.getElementById('guide-title').innerText = '배터리 고방전 스트레스 경고!';
-      document.getElementById('guide-action').innerText = '급격한 전류 방전으로 양극재 격자 수축 열화가 가속됩니다';
-      document.getElementById('guide-action').style.color = '#ef4444';
-      document.getElementById('guide-desc').innerText = '페달을 서서히 놓아 배터리 보호 모드로 복귀하세요';
-    }
-
-    function releasePedal() {
-      isPedalPressed = false;
-      var sc = scenarios[currentScenarioIdx];
-      var box = document.getElementById('guide-box');
-      box.style.borderColor = sc.borderColor;
-      document.getElementById('guide-icon').innerText = sc.icon;
-      document.getElementById('guide-title').innerText = sc.title;
-      document.getElementById('guide-action').innerText = sc.action;
-      document.getElementById('guide-action').style.color = sc.borderColor;
-      document.getElementById('guide-desc').innerText = sc.desc;
-    }
-
-    var scenarios = [
-      {
-        tbtArrow: "⤓",
-        tbtText: "300m 앞 달구벌대로 방면",
-        subText: "완만한 내리막 진입 · 회생제동 유효 구간",
-        icon: "🦶 ➔ 🚫",
-        title: "완만한 내리막 지형 감지",
-        action: "가속 페달에서 발을 떼고 탄력 주행(Coasting)하세요",
-        desc: "예상 에너지 회생: +0.4 kWh · 배터리 수명 방어: +5분",
-        borderColor: "#00e599",
-        meterType: "charge",
-        bsi: "8 (Safe)"
-      },
-      {
-        tbtArrow: "↶",
-        tbtText: "250m 앞 연속 급커브 구간",
-        subText: "곡률 반경 80m 이하 · 선제적 감속 권장",
-        icon: "🔄 ➔ ⚠️",
-        title: "연속 급커브 지형 감지",
-        action: "선제적으로 서서히 감속하여 급격한 회생제동 충격을 방지하세요",
-        desc: "급가감속 방지 모드 가동 · 배터리 C-rate 충격 최소화",
-        borderColor: "#f59e0b",
-        meterType: "power",
-        bsi: "28 (주의)"
-      },
-      {
-        tbtArrow: "🛡️",
-        tbtText: "50m 앞 어린이 보호구역",
-        subText: "생활도로 정속 순항 구간 (제한속도 30km/h)",
-        icon: "🛡️ ➔ ✨",
-        title: "어린이 보호구역 및 생활도로 진입",
-        action: "시속 30km 정속 순항 유지 중 (최적 효율 구간)",
-        desc: "배터리 스트레스 최저 (Safe) · 셀 수명 안정화 중",
-        borderColor: "#38bdf8",
-        meterType: "eco",
-        bsi: "11 (Safe)"
-      }
-    ];
-
-    var currentScenarioIdx = 0;
-
-    function startTelemetrySimulation() {
-      stopTelemetrySimulation();
-      var dist = 300;
-
-      driveInterval = setInterval(function() {
-        if (isPedalPressed) return;
-
-        dist = dist > 50 ? dist - 15 : 300;
-        var currentSc = scenarios[currentScenarioIdx];
-        var bar = document.getElementById('meter-bar');
-
-        if (currentSc.meterType === "charge") {
-          var chargePct = Math.floor(20 + Math.random() * 25);
-          bar.style.background = '#38bdf8';
-          bar.style.left = (50 - chargePct) + '%';
-          bar.style.width = chargePct + '%';
-          document.getElementById('current-crate').innerText = '-0.4 C (회생 중)';
-          document.getElementById('current-crate').style.color = '#38bdf8';
-          document.getElementById('current-speed').innerText = '74 km/h';
-          document.getElementById('bsi-value').innerText = currentSc.bsi;
-          document.getElementById('bsi-value').style.color = '#00e599';
-        } else if (currentSc.meterType === "power") {
-          var powerPct = Math.floor(22 + Math.random() * 18);
-          bar.style.background = '#f59e0b';
-          bar.style.left = '50%';
-          bar.style.width = powerPct + '%';
-          document.getElementById('current-crate').innerText = '+1.1 C (주의)';
-          document.getElementById('current-crate').style.color = '#f59e0b';
-          document.getElementById('current-speed').innerText = '68 km/h';
-          document.getElementById('bsi-value').innerText = currentSc.bsi;
-          document.getElementById('bsi-value').style.color = '#f59e0b';
-        } else {
-          var ecoPct = Math.floor(8 + Math.random() * 10);
-          bar.style.background = '#00e599';
-          bar.style.left = '50%';
-          bar.style.width = ecoPct + '%';
-          document.getElementById('current-crate').innerText = '+0.2 C (최적)';
-          document.getElementById('current-crate').style.color = '#00e599';
-          document.getElementById('current-speed').innerText = '30 km/h';
-          document.getElementById('bsi-value').innerText = currentSc.bsi;
-          document.getElementById('bsi-value').style.color = '#00e599';
-        }
-      }, 1000);
-
-      scenarioInterval = setInterval(function() {
-        if (isPedalPressed) return;
-        currentScenarioIdx = (currentScenarioIdx + 1) % scenarios.length;
-        var sc = scenarios[currentScenarioIdx];
-
-        document.getElementById('navi-arrow').innerText = sc.tbtArrow;
-        document.getElementById('navi-tbt-text').innerText = sc.tbtText;
-        document.getElementById('navi-sub-text').innerText = sc.subText;
-
-        var box = document.getElementById('guide-box');
-        box.style.borderColor = sc.borderColor;
-        document.getElementById('guide-icon').innerText = sc.icon;
-        document.getElementById('guide-title').innerText = sc.title;
-        document.getElementById('guide-action').innerText = sc.action;
-        document.getElementById('guide-action').style.color = sc.borderColor;
-        document.getElementById('guide-desc').innerText = sc.desc;
-      }, 8500);
-    }
-
-    function stopTelemetrySimulation() {
-      if (driveInterval) { clearInterval(driveInterval); driveInterval = null; }
-      if (scenarioInterval) { clearInterval(scenarioInterval); scenarioInterval = null; }
-    }
-
-    var isLimitOn = true;
-    function toggleChargeLimit(btn) {
-      isLimitOn = !isLimitOn;
-      if (isLimitOn) {
-        btn.innerText = '80% 충전 상한 적용 ON';
-        btn.style.color = '#22c55e';
-        btn.style.borderColor = '#22c55e';
-        alert('차량 BMS 연동: 야간 완속 충전 상한선이 80%로 고정되어 캘린더 열화를 방어합니다.');
-      } else {
-        btn.innerText = '100% 완전 충전 모드';
-        btn.style.color = '#94a3b8';
-        btn.style.borderColor = '#33445c';
-        alert('충전 상한 해제: 장거리 운행을 위한 100% 완전 충전 모드로 변경되었습니다.');
-      }
-    }
-
-    updateTimeUI();
-  </script>
-</body>
-</html>
+updateTimeUI();$('safety-tag').innerText='🛡️ 주차 상태: 설정·포인트 전환 가능';
+</script>
+</body></html>
